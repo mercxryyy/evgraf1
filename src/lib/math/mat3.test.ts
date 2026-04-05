@@ -49,6 +49,58 @@ test("invert translation", () => {
     }
 });
 
+
+test("multiply: black-box property using points (A*B acting like A after B)", () => {
+  const A = mat3.fromTransform(5, 7, 0.2, 1.5, 0.8);
+  const B = mat3.fromTransform(-3, 2, Math.PI/6, 0.5, 2);
+
+  const points = [
+    {x:0,y:0}, {x:1,y:0}, {x:0,y:1}, {x:2.3,y:-1.7}, {x:-4.1,y:3.2}
+  ];
+
+  for (const pt of points) {
+    const AB = mat3.multiply(A, B);
+    const p1 = mat3.transformPoint(AB, pt.x, pt.y);
+
+    const pB = mat3.transformPoint(B, pt.x, pt.y);
+    const p2 = mat3.transformPoint(A, pB.x, pB.y);
+
+    expect(p1.x).toBeCloseTo(p2.x);
+    expect(p1.y).toBeCloseTo(p2.y);
+  }
+
+  const I = mat3.identity();
+  expectMatCloseTo(mat3.multiply(A, I), A);
+  expectMatCloseTo(mat3.multiply(I, A), A);
+});
+
+
+test("randomized sanity: transformPoint matches manual steps for many deterministic cases", () => {
+  for (let i = 0; i < 30; i++) {
+    const tx = (i % 7) - 3;
+    const ty = ((i * 3) % 11) - 5;
+    const angle = (i * 0.37) % (2*Math.PI);
+    const sx = 0.2 + ((i % 5) * 0.6);
+    const sy = 0.3 + ((i % 3) * 0.8);
+    const M = mat3.fromTransform(tx, ty, angle, sx, sy);
+    const px = (i % 5) - 2.5;
+    const py = ((i * 2) % 7) - 3.5;
+
+    const pFromM = mat3.transformPoint(M, px, py);
+
+    const scaled = { x: px * sx, y: py * sy };
+    const rotated = {
+      x: scaled.x * Math.cos(angle) - scaled.y * Math.sin(angle),
+      y: scaled.x * Math.sin(angle) + scaled.y * Math.cos(angle),
+    };
+    const manual = { x: rotated.x + tx, y: rotated.y + ty };
+
+    expect(pFromM.x).toBeCloseTo(manual.x);
+    expect(pFromM.y).toBeCloseTo(manual.y);
+  }
+});
+
+
 test("fromTransform", () => {
     const M = mat3.fromTransform(100, 50, Math.PI / 4, 2, 1);
     const p = mat3.transformPoint(M, 1, 0);

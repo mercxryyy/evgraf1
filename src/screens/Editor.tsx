@@ -1,73 +1,102 @@
-import { useParams, Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import { ArrowLeft, Save, MousePointer2, Square, Circle } from "lucide-react";
+// src/screens/Editor.tsx
+import { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { ArrowLeft, Save, Grid3x3, Brush, Eye } from 'lucide-react';
+import { CanvasScene } from '../components/CanvasScene';
+import type { LineAlg } from '../lib/raster/RasterRenderer';
 
-const tools = [
-  { icon: MousePointer2, label: "Выбор" },
-  { icon: Square, label: "Квадрат" },
-  { icon: Circle, label: "Круг" },
-];
+export default function Editor() {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [lineAlg, setLineAlg] = useState<LineAlg>('bresenham');
+  const [showGrid, setShowGrid] = useState(false);
 
-function Editor() {
-  const { id } = useParams<{ id: string }>();
+  const isNewProject = id === 'new';
+  const projectTitle = isNewProject ? 'Новый проект' : `Проект ${id}`;
 
   return (
     <motion.div
-      className="h-screen flex flex-col"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
+      className="h-full flex flex-col"
     >
-      {/* Toolbar */}
-      <header className="h-14 border-b border-slate-700 bg-slate-900 flex items-center justify-between px-4 shrink-0">
-        <Link
-          to="/"
-          className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors"
-        >
-          <ArrowLeft size={20} />
-          Назад
-        </Link>
-        <h2 className="text-lg font-semibold">
-          Редактирование проекта №{id}
-        </h2>
-        <button className="flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-4 py-1.5 rounded-lg transition-colors cursor-pointer">
-          <Save size={16} />
-          Сохранить
-        </button>
-      </header>
+      {/* Верхняя панель */}
+      <div className="flex items-center justify-between bg-slate-900 border-b border-slate-800 px-4 py-2">
+        <div className="flex items-center gap-4">
+          <motion.button
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-slate-300 hover:text-white px-3 py-2 rounded-lg hover:bg-slate-800"
+            whileHover={{ x: -2 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <ArrowLeft size={18} />
+            Назад
+          </motion.button>
+          <h2 className="text-lg font-semibold text-white">{projectTitle}</h2>
+        </div>
 
-      <div className="flex flex-1 min-h-0">
-        {/* Left panel — Tools */}
-        <aside className="w-16 border-r border-slate-700 bg-slate-900 flex flex-col items-center py-4 gap-2 shrink-0">
-          {tools.map(({ icon: Icon, label }) => (
+        {/* Панель управления */}
+        <div className="flex items-center gap-3">
+          {/* Переключатель алгоритмов линий */}
+          <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
             <button
-              key={label}
-              title={label}
-              className="w-10 h-10 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+              onClick={() => setLineAlg('bresenham')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all ${
+                lineAlg === 'bresenham'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <Icon size={20} />
+              <Grid3x3 size={16} />
+              Брезенхем
             </button>
-          ))}
-        </aside>
+            <button
+              onClick={() => setLineAlg('wu')}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm transition-all ${
+                lineAlg === 'wu'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Brush size={16} />
+              Сяолинь Ву
+            </button>
+          </div>
 
-        {/* Canvas */}
-        <main className="flex-1 bg-slate-800 flex items-center justify-center p-8 overflow-auto">
-          <div className="w-full max-w-3xl aspect-[4/3] bg-white rounded-lg shadow-2xl" />
-        </main>
+          {/* Кнопка сохранения */}
+          <motion.button
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <Save size={18} />
+            Сохранить
+          </motion.button>
+        </div>
+      </div>
 
-        {/* Right panel — Properties */}
-        <aside className="w-64 border-l border-slate-700 bg-slate-900 p-4 shrink-0">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">
-            Свойства
-          </h3>
-          <p className="text-sm text-slate-500">
-            Выберите объект на холсте для редактирования свойств.
-          </p>
-        </aside>
+      {/* Холст с растеризатором */}
+      <div className="flex-1 p-4 bg-slate-800">
+        <div className="w-full h-full bg-slate-900 rounded-xl shadow-2xl overflow-hidden border border-slate-700">
+          <CanvasScene lineAlg={lineAlg} />
+        </div>
+      </div>
+
+      {/* Нижняя панель с информацией */}
+      <div className="bg-slate-900 border-t border-slate-800 px-4 py-2 text-center">
+        <p className="text-xs text-slate-400">
+          🎨 Режим: <span className="text-blue-400 font-mono">
+            {lineAlg === 'wu' ? 'Сглаженные линии (Xiaolin Wu)' : 'Чёткие линии (Bresenham)'}
+          </span>
+          {' — '}
+          🔵 Красный треугольник (заливка+обводка) • 🟠 Квадрат • 🟣 Пятиугольник (анимация)
+          {' — '}
+          🟡 Тест прозрачности (фиолетовое перекрытие)
+        </p>
       </div>
     </motion.div>
   );
 }
-
-export default Editor;
