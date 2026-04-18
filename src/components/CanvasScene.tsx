@@ -1,200 +1,168 @@
 import { useEffect, useRef, useState } from 'react';
-import { RasterRenderer, type LineAlg, type RGBA, hexToRGBA } from '../lib/raster/RasterRenderer';
+import { RasterRenderer, type LineAlg, type RGBA } from '../lib/raster/RasterRenderer';
 
 interface CanvasSceneProps {
-  lineAlg: LineAlg;
+    lineAlg: LineAlg;
 }
 
 export const CanvasScene = ({ lineAlg }: CanvasSceneProps) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const rendererRef = useRef<RasterRenderer | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [frameCount, setFrameCount] = useState(0);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const rendererRef = useRef<RasterRenderer | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [debug, setDebug] = useState('');
 
-  useEffect(() => {
-    if (rendererRef.current) {
-      rendererRef.current.setLineAlgorithm(lineAlg);
-    }
-  }, [lineAlg]);
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const container = containerRef.current;
+        if (!canvas || !container) return;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+        const renderer = new RasterRenderer(canvas);
+        renderer.setLineAlgorithm(lineAlg);
+        rendererRef.current = renderer;
 
-    const renderer = new RasterRenderer(canvas);
-    renderer.setLineAlgorithm(lineAlg);
-    rendererRef.current = renderer;
+        const doResize = () => {
+            renderer.resize();
+            setDebug(`w=${renderer.width}, h=${renderer.height}`);
+        };
 
-    const ro = new ResizeObserver(() => {
-      renderer.resize();
-    });
+        doResize();
+        setTimeout(doResize, 100);
+        setTimeout(doResize, 500);
 
-    if (containerRef.current) {
-      ro.observe(containerRef.current);
-    } else {
-      ro.observe(canvas);
-    }
+        const ro = new ResizeObserver(() => {
+            doResize();
+        });
+        ro.observe(container);
 
-    let animationId = 0;
-    let time = 0;
+        let animationId: number;
 
-    const frame = () => {
-      const r = rendererRef.current;
-      if (r) {
-        r.beginFrame(true); 
+        const drawPolyline = (r: RasterRenderer, points: { x: number; y: number }[], color: RGBA, width: number) => {
+            if (points.length < 2) return;
+            for (let i = 0; i < points.length - 1; i++) {
+                r.strokeLine(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, color, width);
+            }
+        };
 
-        const w = r.width;
-        const h = r.height;
-        const centerX = w / 2;
-        const centerY = h / 2;
+        const frame = () => {
+            const r = rendererRef.current;
+            if (r && r.width > 0 && r.height > 0) {
+                r.beginFrame(true);
 
+                const w = r.width;
+                const h = r.height;
+                const cx = w / 2;
+                const cy = h / 2;
 
-        const red: RGBA = { r: 255, g: 0, b: 0, a: 255 };
-        const green: RGBA = { r: 0, g: 255, b: 0, a: 255 };
-        const blue: RGBA = { r: 0, g: 0, b: 255, a: 255 };
-        const yellow: RGBA = { r: 255, g: 255, b: 0, a: 255 };
-        const orange: RGBA = { r: 255, g: 128, b: 0, a: 255 };
-        const purple: RGBA = { r: 128, g: 0, b: 128, a: 255 };
-        const cyan: RGBA = { r: 0, g: 255, b: 255, a: 200 }; 
-        const pink: RGBA = { r: 255, g: 192, b: 203, a: 180 }; 
-        const white: RGBA = { r: 255, g: 255, b: 255, a: 255 };
-        const black: RGBA = { r: 0, g: 0, b: 0, a: 255 };
+                const red: RGBA = { r: 255, g: 0, b: 0, a: 255 };
+                const semiRed: RGBA = { r: 255, g: 0, b: 0, a: 128 };
+                const white: RGBA = { r: 255, g: 255, b: 255, a: 255 };
+                const blue: RGBA = { r: 0, g: 0, b: 255, a: 255 };
+                const solidBlue: RGBA = { r: 0, g: 0, b: 255, a: 255 };
+                const purple: RGBA = { r: 128, g: 0, b: 128, a: 255 };
+                const yellow: RGBA = { r: 255, g: 255, b: 0, a: 255 };
+                const greenLine: RGBA = { r: 0, g: 255, b: 0, a: 255 };
 
-        r.drawLine(50, 50, 300, 80, red);
-        r.drawLine(50, 100, 400, 100, green);
-        r.drawLine(50, 120, 400, 120, blue);
-        r.drawLine(450, 50, 450, 200, yellow);
-        r.drawLine(470, 50, 470, 200, orange);
-        r.drawLine(50, 150, 300, 250, purple);
-        r.drawLine(50, 170, 300, 270, cyan);
-        
-        r.fillCircle(centerX - 150, centerY - 100, 60, red);
-        r.strokeLine(centerX - 150, centerY - 100 - 60, centerX - 150, centerY - 100 + 60, black, 3);
-        r.strokeLine(centerX - 150 - 60, centerY - 100, centerX - 150 + 60, centerY - 100, black, 3);
-        
-        r.fillCircle(centerX - 180, centerY - 70, 40, cyan);
-        
-        const pulseRadius = 30 + Math.sin(time * 0.005) * 10;
-        r.fillCircle(centerX + 150, centerY - 100, pulseRadius, pink);
-        r.strokeCircle?.(centerX + 150, centerY - 100, pulseRadius, white, 2);
-        
-        const triangle = [
-          { x: centerX - 100, y: centerY + 50 },
-          { x: centerX, y: centerY + 150 },
-          { x: centerX - 200, y: centerY + 150 },
-        ];
-        r.fillPolygon(triangle, blue);
-        r.strokePolygon(triangle, white, 3);
-        
-        const square = [
-          { x: centerX + 50, y: centerY + 50 },
-          { x: centerX + 200, y: centerY + 50 },
-          { x: centerX + 200, y: centerY + 150 },
-          { x: centerX + 50, y: centerY + 150 },
-        ];
-        r.fillPolygon(square, orange);
-        r.strokePolygon(square, black, 4);
-        
-        const pentagon: { x: number; y: number }[] = [];
-        const radius = 70;
-        const angleOffset = time * 0.002;
-        for (let i = 0; i < 5; i++) {
-          const angle = (i * 72 * Math.PI / 180) + angleOffset;
-          pentagon.push({
-            x: centerX + 150 + Math.cos(angle) * radius,
-            y: centerY + 50 + Math.sin(angle) * radius,
-          });
-        }
-        r.fillPolygon(pentagon, purple);
-        r.strokePolygon(pentagon, yellow, 3);
-        
-        r.strokeLine(50, 400, 300, 480, orange, 10);
-        
-        r.strokeLine(50, 430, 400, 510, cyan, 20);
-        
-        const polyline = [
-          { x: 450, y: 400 },
-          { x: 550, y: 480 },
-          { x: 650, y: 420 },
-          { x: 750, y: 500 },
-        ];
-        r.strokePolygon(polyline, pink, 8);
-        
-        const redSquare = [
-          { x: centerX - 300, y: centerY + 200 },
-          { x: centerX - 150, y: centerY + 200 },
-          { x: centerX - 150, y: centerY + 320 },
-          { x: centerX - 300, y: centerY + 320 },
-        ];
-        r.fillPolygon(redSquare, { r: 255, g: 0, b: 0, a: 200 });
-        
-        const blueSquare = [
-          { x: centerX - 220, y: centerY + 200 },
-          { x: centerX - 70, y: centerY + 200 },
-          { x: centerX - 70, y: centerY + 320 },
-          { x: centerX - 220, y: centerY + 320 },
-        ];
-        r.fillPolygon(blueSquare, { r: 0, g: 0, b: 255, a: 200 });
-        
-        r.fillCircle(centerX - 185, centerY + 260, 40, { r: 0, g: 255, b: 0, a: 180 });
-        
-        const hexColor = hexToRGBA('#44FFAA', 200);
-        r.fillCircle(centerX + 200, centerY + 280, 35, hexColor);
-        r.strokeCircle?.(centerX + 200, centerY + 280, 35, hexToRGBA('#FF44AA'), 3);
-        
-        const labelY = h - 30;
-        const label = lineAlg === 'wu' ? 'Сглаженные линии (Ву)' : 'Чёткие линии (Брезенхем)';
-        
-        r.strokeLine(20, labelY - 10, 20 + label.length * 8, labelY - 10, white, 2);
-        
-        setFrameCount(prev => prev + 1);
-      }
-      
-      r?.commit();
-      time++;
-      animationId = requestAnimationFrame(frame);
-    };
-    
-    frame();
-    
-    return () => {
-      cancelAnimationFrame(animationId);
-      ro.disconnect();
-      renderer.dispose();
-    };
-  }, []);
-  
-  const strokeCircle = (r: RasterRenderer, cx: number, cy: number, radius: number, color: RGBA, width: number) => {
-    const segments = 36;
-    const points: { x: number; y: number }[] = [];
-    for (let i = 0; i <= segments; i++) {
-      const angle = (i * 2 * Math.PI / segments);
-      points.push({
-        x: cx + Math.cos(angle) * radius,
-        y: cy + Math.sin(angle) * radius,
-      });
-    }
-    r.strokePolygon(points, color, width);
-  };
-  
-  (RasterRenderer.prototype as any).strokeCircle = function(
-    cx: number, cy: number, radius: number, color: RGBA, width: number
-  ) {
-    const segments = 48;
-    const points: { x: number; y: number }[] = [];
-    for (let i = 0; i <= segments; i++) {
-      const angle = (i * 2 * Math.PI / segments);
-      points.push({
-        x: cx + Math.cos(angle) * radius,
-        y: cy + Math.sin(angle) * radius,
-      });
-    }
-    this.strokePolygon(points, color, width);
-  };
-  
-  return (
-    <div ref={containerRef} className="w-full h-full min-h-[600px] bg-slate-900 rounded-lg overflow-hidden">
-      <canvas ref={canvasRef} className="w-full h-full" style={{ display: 'block' }} />
-    </div>
-  );
+                const radius = 80;
+
+                for (let y = -radius; y <= radius; y++) {
+                    for (let x = -radius; x <= radius; x++) {
+                        if (x * x + y * y <= radius * radius) {
+                            const px = cx + x;
+                            const py = cy + y;
+                            if (px >= 0 && px < w && py >= 0 && py < h) {
+                                r.setPixel(px, py, red);
+                            }
+                        }
+                    }
+                }
+                r.strokeCircle(cx, cy, radius, white, 5);
+
+                const squareSize = 100;
+                const squareX = 50;
+                const squareY = 50;
+
+                for (let y = 0; y < squareSize; y++) {
+                    for (let x = 0; x < squareSize; x++) {
+                        const px = squareX + x;
+                        const py = squareY + y;
+                        if (px >= 0 && px < w && py >= 0 && py < h) {
+                            r.setPixel(px, py, solidBlue);
+                        }
+                    }
+                }
+
+                const testRadius = 40;
+                const testCx = squareX + squareSize - 20;
+                const testCy = squareY + squareSize / 2;
+
+                for (let y = -testRadius; y <= testRadius; y++) {
+                    for (let x = -testRadius; x <= testRadius; x++) {
+                        if (x * x + y * y <= testRadius * testRadius) {
+                            const px = testCx + x;
+                            const py = testCy + y;
+                            if (px >= 0 && px < w && py >= 0 && py < h) {
+                                r.blendPixel(px, py, semiRed, 1);
+                            }
+                        }
+                    }
+                }
+
+                const triangle = [
+                    { x: 100, y: h - 150 },
+                    { x: 200, y: h - 50 },
+                    { x: 0, y: h - 50 },
+                ];
+                r.fillPolygon(triangle, blue);
+                r.strokePolygon(triangle, white, 2);
+
+                const greenPolyline = [
+                    { x: w - 350, y: 80 },
+                    { x: w - 270, y: 110 },
+                    { x: w - 230, y: 50 },
+                    { x: w - 170, y: 90 },
+                    { x: w - 110, y: 40 },
+                ];
+                drawPolyline(r, greenPolyline, greenLine, 10);
+
+                const pentagonRadius = 50;
+                const pentagonCenterX = cx + 180;
+                const pentagonCenterY = cy - 120;
+                const pentagon: { x: number; y: number }[] = [];
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * 72 * Math.PI / 180);
+                    pentagon.push({
+                        x: pentagonCenterX + Math.cos(angle) * pentagonRadius,
+                        y: pentagonCenterY + Math.sin(angle) * pentagonRadius,
+                    });
+                }
+                r.fillPolygon(pentagon, purple);
+                r.strokePolygon(pentagon, yellow, 2);
+            }
+            r?.commit();
+            animationId = requestAnimationFrame(frame);
+        };
+
+        frame();
+
+        return () => {
+            cancelAnimationFrame(animationId);
+            ro.disconnect();
+            renderer.dispose();
+        };
+    }, [lineAlg]);
+
+    return (
+        <div
+            ref={containerRef}
+            className="relative w-full h-full bg-white"
+        >
+            <canvas
+                ref={canvasRef}
+                className="block w-full h-full"
+            />
+            <div className="absolute bottom-0 left-0 bg-black/70 text-lime-400 px-2 py-1 text-xs font-mono z-[100] pointer-events-none">
+                {debug} | {lineAlg === 'wu' ? 'Сглаженные (Ву)' : 'Чёткие (Брезенхем)'}
+            </div>
+        </div>
+    );
 };
