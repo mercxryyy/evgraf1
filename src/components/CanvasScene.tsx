@@ -1,8 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { RasterRenderer, type LineAlg, type RGBA } from '../lib/raster/RasterRenderer';
+import { RasterRenderer, type LineAlg } from '../lib/raster/RasterRenderer';
+import { Rect, Line, Oval, type Shape } from '../lib/shapes';
 
 interface CanvasSceneProps {
     lineAlg: LineAlg;
+}
+
+interface HitInfo {
+    shape: Shape | null;
+    localX: number;
+    localY: number;
 }
 
 export const CanvasScene = ({ lineAlg }: CanvasSceneProps) => {
@@ -10,6 +17,10 @@ export const CanvasScene = ({ lineAlg }: CanvasSceneProps) => {
     const rendererRef = useRef<RasterRenderer | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [debug, setDebug] = useState('');
+    const [hitInfo, setHitInfo] = useState<HitInfo>({ shape: null, localX: 0, localY: 0 });
+
+    // Создаём фигуры один раз, чтобы они не пересоздавались в каждом кадре
+    const shapesRef = useRef<Shape[]>([]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -20,146 +31,144 @@ export const CanvasScene = ({ lineAlg }: CanvasSceneProps) => {
         renderer.setLineAlgorithm(lineAlg);
         rendererRef.current = renderer;
 
+        // Инициализируем фигуры
+        const rect = new Rect(200, 150);
+        rect.fillStyle = '#FF0000';
+        rect.fillOpacity = 0.7;
+        rect.strokeStyle = '#FFFFFF';
+        rect.strokeWidth = 2;
+
+        const oval = new Oval(140, 110);
+        oval.fillStyle = '#0000FF';
+        oval.fillOpacity = 0.6;
+        oval.strokeStyle = '#FFFF00';
+        oval.strokeWidth = 2;
+
+        const line = new Line(0, 0, 200, 80);
+        line.strokeStyle = '#00FF00';
+        line.strokeWidth = 8;
+        line.strokeOpacity = 0.9;
+
+        shapesRef.current = [rect, oval, line];
+
         const doResize = () => {
             renderer.resize();
-            setDebug(`w=${renderer.width}, h=${renderer.height}`);
+            const w = renderer.width;
+            const h = renderer.height;
+            setDebug(`w=${w}, h=${h}`);
+            // Обновляем позиции фигур при изменении размера окна
+            rect.transform.x = w / 2 - 80;
+            rect.transform.y = h / 2 - 60;
+            oval.transform.x = w / 2 + 20;
+            oval.transform.y = h / 2 + 10;
+            line.transform.x = w / 2 - 100;
+            line.transform.y = h / 2 + 80;
         };
-
         doResize();
         setTimeout(doResize, 100);
         setTimeout(doResize, 500);
 
-        const ro = new ResizeObserver(() => {
-            doResize();
-        });
+        const ro = new ResizeObserver(() => doResize());
         ro.observe(container);
 
-        let animationId: number;
+        // Обработчик движения мыши
+        const handleMouseMove = (e: MouseEvent) => {
+            const r = rendererRef.current;
+            if (!r || r.width === 0 || r.height === 0) return;
 
-        const drawPolyline = (r: RasterRenderer, points: { x: number; y: number }[], color: RGBA, width: number) => {
-            if (points.length < 2) return;
-            for (let i = 0; i < points.length - 1; i++) {
-                r.strokeLine(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y, color, width);
+            // Получаем координаты мыши относительно canvas (в физических пикселях)
+            const rectCanvas = canvas.getBoundingClientRect();
+            const scaleX = r.width / rectCanvas.width;
+            const scaleY = r.height / rectCanvas.height;
+            const mouseX = (e.clientX - rectCanvas.left) * scaleX;
+            const mouseY = (e.clientY - rectCanvas.top) * scaleY;
+
+            // Проверяем попадание в каждую фигуру (сначала последние – визуально выше)
+            let hitShape: Shape | null = null;
+            let hitLocal = { x: 0, y: 0 };
+            for (let i = shapesRef.current.length - 1; i >= 0; i--) {
+                const shape = shapesRef.current[i];
+                if (shape.hitTest(mouseX, mouseY)) {
+                    const local = shape.transformPointToLocal(mouseX, mouseY);
+                    hitShape = shape;
+                    hitLocal = local;
+                    break;
+                }
             }
+            setHitInfo({ shape: hitShape, localX: hitLocal.x, localY: hitLocal.y });
         };
 
+        canvas.addEventListener('mousemove', handleMouseMove);
+
+        let animationId: number;
         const frame = () => {
             const r = rendererRef.current;
             if (r && r.width > 0 && r.height > 0) {
                 r.beginFrame(true);
-
                 const w = r.width;
                 const h = r.height;
-                const cx = w / 2;
-                const cy = h / 2;
 
-                const red: RGBA = { r: 255, g: 0, b: 0, a: 255 };
-                const semiRed: RGBA = { r: 255, g: 0, b: 0, a: 128 };
-                const white: RGBA = { r: 255, g: 255, b: 255, a: 255 };
-                const blue: RGBA = { r: 0, g: 0, b: 255, a: 255 };
-                const solidBlue: RGBA = { r: 0, g: 0, b: 255, a: 255 };
-                const purple: RGBA = { r: 128, g: 0, b: 128, a: 255 };
-                const yellow: RGBA = { r: 255, g: 255, b: 0, a: 255 };
-                const greenLine: RGBA = { r: 0, g: 255, b: 0, a: 255 };
-
-                const radius = 80;
-
-                for (let y = -radius; y <= radius; y++) {
-                    for (let x = -radius; x <= radius; x++) {
-                        if (x * x + y * y <= radius * radius) {
-                            const px = cx + x;
-                            const py = cy + y;
-                            if (px >= 0 && px < w && py >= 0 && py < h) {
-                                r.setPixel(px, py, red);
-                            }
-                        }
-                    }
-                }
-                r.strokeCircle(cx, cy, radius, white, 5);
-
-                const squareSize = 100;
-                const squareX = 50;
-                const squareY = 50;
-
-                for (let y = 0; y < squareSize; y++) {
-                    for (let x = 0; x < squareSize; x++) {
-                        const px = squareX + x;
-                        const py = squareY + y;
-                        if (px >= 0 && px < w && py >= 0 && py < h) {
-                            r.setPixel(px, py, solidBlue);
-                        }
-                    }
+                // Рисуем фигуры (их позиции уже обновлены в doResize)
+                for (const shape of shapesRef.current) {
+                    shape.drawRaster(r);
                 }
 
-                const testRadius = 40;
-                const testCx = squareX + squareSize - 20;
-                const testCy = squareY + squareSize / 2;
-
-                for (let y = -testRadius; y <= testRadius; y++) {
-                    for (let x = -testRadius; x <= testRadius; x++) {
-                        if (x * x + y * y <= testRadius * testRadius) {
-                            const px = testCx + x;
-                            const py = testCy + y;
-                            if (px >= 0 && px < w && py >= 0 && py < h) {
-                                r.blendPixel(px, py, semiRed, 1);
-                            }
-                        }
-                    }
+                // Дополнительные линии для демонстрации алгоритмов (не участвуют в hit test)
+                const lineColor = { r: 255, g: 255, b: 0, a: 255 };
+                const x1 = 40, y1 = 40, x2 = w - 40, y2 = h - 40;
+                if (lineAlg === 'wu') {
+                    r.drawLineWu(x1, y1, x2, y2, lineColor);
+                } else {
+                    r.drawLineBrassenham(x1, y1, x2, y2, lineColor);
                 }
-
-                const triangle = [
-                    { x: 100, y: h - 150 },
-                    { x: 200, y: h - 50 },
-                    { x: 0, y: h - 50 },
-                ];
-                r.fillPolygon(triangle, blue);
-                r.strokePolygon(triangle, white, 2);
-
-                const greenPolyline = [
-                    { x: w - 350, y: 80 },
-                    { x: w - 270, y: 110 },
-                    { x: w - 230, y: 50 },
-                    { x: w - 170, y: 90 },
-                    { x: w - 110, y: 40 },
-                ];
-                drawPolyline(r, greenPolyline, greenLine, 10);
-
-                const pentagonRadius = 50;
-                const pentagonCenterX = cx + 180;
-                const pentagonCenterY = cy - 120;
-                const pentagon: { x: number; y: number }[] = [];
-                for (let i = 0; i < 5; i++) {
-                    const angle = (i * 72 * Math.PI / 180);
-                    pentagon.push({
-                        x: pentagonCenterX + Math.cos(angle) * pentagonRadius,
-                        y: pentagonCenterY + Math.sin(angle) * pentagonRadius,
-                    });
-                }
-                r.fillPolygon(pentagon, purple);
-                r.strokePolygon(pentagon, yellow, 2);
             }
-            r?.commit();
+            rendererRef.current?.commit();
             animationId = requestAnimationFrame(frame);
         };
-
         frame();
 
         return () => {
             cancelAnimationFrame(animationId);
             ro.disconnect();
+            canvas.removeEventListener('mousemove', handleMouseMove);
             renderer.dispose();
         };
     }, [lineAlg]);
 
+    // Определяем тип фигуры для отображения
+    const getShapeType = (shape: Shape | null): string => {
+        if (!shape) return '';
+        if (shape instanceof Rect) return 'Прямоугольник';
+        if (shape instanceof Oval) return 'Овал';
+        if (shape instanceof Line) return 'Линия';
+        return 'Фигура';
+    };
+
     return (
-        <div
-            ref={containerRef}
-            className="relative w-full h-full bg-white"
-        >
-            <canvas
-                ref={canvasRef}
-                className="block w-full h-full"
-            />
+        <div ref={containerRef} className="relative w-full h-full bg-slate-950">
+            <canvas ref={canvasRef} className="block w-full h-full" style={{ cursor: 'crosshair' }} />
+            {/* Окно с информацией о попадании */}
+            <div className="absolute top-4 right-4 bg-black/80 backdrop-blur-sm rounded-lg p-3 text-sm font-mono z-20 w-64 border border-gray-700 shadow-xl pointer-events-none">
+                <div className="text-white font-bold mb-2">Попадание курсора</div>
+                {hitInfo.shape ? (
+                    <>
+                        <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                            <span className="text-green-300">{getShapeType(hitInfo.shape)}</span>
+                        </div>
+                        <div className="text-gray-300 text-xs mt-1">
+                            Локальные координаты: ({hitInfo.localX.toFixed(1)}, {hitInfo.localY.toFixed(1)})
+                        </div>
+                        <div className="text-gray-400 text-xs mt-1">
+                            {hitInfo.shape instanceof Rect && `Ширина: ${(hitInfo.shape as Rect).w}, Высота: ${(hitInfo.shape as Rect).h}`}
+                            {hitInfo.shape instanceof Oval && `Радиусы: ${(hitInfo.shape as Oval).rx} × ${(hitInfo.shape as Oval).ry}`}
+                            {hitInfo.shape instanceof Line && `Длина линии: ${Math.hypot((hitInfo.shape as Line).x2 - (hitInfo.shape as Line).x1, (hitInfo.shape as Line).y2 - (hitInfo.shape as Line).y1).toFixed(1)}`}
+                        </div>
+                    </>
+                ) : (
+                    <div className="text-gray-400">Нет попадания</div>
+                )}
+            </div>
             <div className="absolute bottom-0 left-0 bg-black/70 text-lime-400 px-2 py-1 text-xs font-mono z-[100] pointer-events-none">
                 {debug} | {lineAlg === 'wu' ? 'Сглаженные (Ву)' : 'Чёткие (Брезенхем)'}
             </div>

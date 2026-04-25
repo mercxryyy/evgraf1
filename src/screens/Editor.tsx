@@ -38,9 +38,7 @@ export default function Editor() {
           <h2 className="text-lg font-semibold text-white">{projectTitle}</h2>
         </div>
 
-        {/* Панель управления */}
         <div className="flex items-center gap-3">
-          {/* Переключатель алгоритмов линий */}
           <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-1">
             <button
               onClick={() => setLineAlg('bresenham')}
@@ -66,7 +64,6 @@ export default function Editor() {
             </button>
           </div>
 
-          {/* Кнопка сохранения */}
           <motion.button
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
             whileHover={{ scale: 1.02 }}
@@ -78,21 +75,19 @@ export default function Editor() {
         </div>
       </div>
 
-      {/* Холст с растеризатором */}
       <div className="flex-1 p-4 bg-slate-800">
         <div className="w-full h-full bg-slate-900 rounded-xl shadow-2xl overflow-hidden border border-slate-700">
           <CanvasScene lineAlg={lineAlg} />
         </div>
       </div>
 
-      {/* Нижняя панель с информацией */}
       <div className="bg-slate-900 border-t border-slate-800 px-4 py-2 text-center">
         <p className="text-xs text-slate-400">
           🎨 Режим: <span className="text-blue-400 font-mono">
             {lineAlg === 'wu' ? 'Сглаженные линии (Xiaolin Wu)' : 'Чёткие линии (Bresenham)'}
           </span>
           {' — '}
-          🔵 Красный треугольник (заливка+обводка) • 🟠 Квадрат • 🟣 Пятиугольник (анимация)
+          🔵 Красный треугольник (заливка+обводка) • 🟠 Квадрат • 🟣 Пятиугольник 
           {' — '}
           🟡 Тест прозрачности (фиолетовое перекрытие)
         </p>

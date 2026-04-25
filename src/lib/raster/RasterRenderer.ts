@@ -161,39 +161,62 @@ this.height);
     }
 
     drawLineWu(x0: number, y0: number, x1: number, y1: number, color: RGBA) {
-        const steep = Math.abs(y1 - y0) > Math.abs(x1 - x0);
-        let ax0 = x0, ay0 = y0, ax1 = x1, ay1 = y1;
-        if (steep) { [ax0, ay0] = [ay0, ax0]; [ax1, ay1] = [ay1, ax1]; }
-        if (ax0 > ax1) { [ax0, ax1] = [ax1, ax0]; [ay0, ay1] = [ay1, ay0]; }
-        const dx = ax1 - ax0;
-        const dy = ay1 - ay0;
-        const gradient = dx === 0 ? 1 : dy / dx;
-        const drawPixel = (x: number, y: number, intensity: number) => {
-            const blendedColor = { ...color, a: Math.floor(color.a * intensity) };
-            if (steep) this.blendPixel(y, x, blendedColor);
-            else this.blendPixel(x, y, blendedColor);
-        };
-        let xend = Math.round(ax0);
-        let yend = ay0 + gradient * (xend - ax0);
-        const xgap = 1 - (ax0 + 0.5 - Math.floor(ax0));
-        const xpxl1 = xend;
-        const ypxl1 = Math.floor(yend);
-        drawPixel(xpxl1, ypxl1, (1 - (yend - ypxl1)) * xgap);
-        drawPixel(xpxl1, ypxl1 + 1, (yend - ypxl1) * xgap);
-        let intery = yend + gradient;
-        xend = Math.round(ax1);
-        yend = ay1 + gradient * (xend - ax1);
-        const xgap2 = (ax1 + 0.5 - Math.floor(ax1));
-        const xpxl2 = xend;
-        const ypxl2 = Math.floor(yend);
-        drawPixel(xpxl2, ypxl2, (1 - (yend - ypxl2)) * xgap2);
-        drawPixel(xpxl2, ypxl2 + 1, (yend - ypxl2) * xgap2);
-        for (let x = xpxl1 + 1; x <= xpxl2 - 1; x++) {
-            drawPixel(x, Math.floor(intery), 1 - (intery - Math.floor(intery)));
-            drawPixel(x, Math.floor(intery) + 1, intery - Math.floor(intery));
-            intery += gradient;
-        }
+    const steep = Math.abs(y1 - y0) > Math.abs(x1 - x0);
+    let ax0 = x0, ay0 = y0, ax1 = x1, ay1 = y1;
+
+    if (steep) {
+        [ax0, ay0] = [ay0, ax0];
+        [ax1, ay1] = [ay1, ax1];
     }
+    if (ax0 > ax1) {
+        [ax0, ax1] = [ax1, ax0];
+        [ay0, ay1] = [ay1, ay0];
+    }
+
+    const dx = ax1 - ax0;
+    const dy = ay1 - ay0;
+    const gradient = dx === 0 ? 1 : dy / dx;
+
+    const plot = (x: number, y: number, intensity: number) => {
+        const blendedColor = { ...color, a: Math.min(255, Math.max(0, Math.round(color.a * intensity))) };
+        if (steep) {
+            this.blendPixel(y, x, blendedColor, 1);
+        } else {
+            this.blendPixel(x, y, blendedColor, 1);
+        }
+    };
+
+    let xend = Math.round(ax0);
+    let yend = ay0 + gradient * (xend - ax0);
+    const xgap = 1 - (ax0 + 0.5 - Math.floor(ax0));
+    const xpxl1 = xend;
+    const ypxl1 = Math.floor(yend);
+    const frac = yend - ypxl1;
+
+    plot(xpxl1, ypxl1, (1 - frac) * xgap);
+    plot(xpxl1, ypxl1 + 1, frac * xgap);
+
+    let intery = yend + gradient;
+
+    // обработка второго конца
+    xend = Math.round(ax1);
+    yend = ay1 + gradient * (xend - ax1);
+    const xgap2 = (ax1 + 0.5 - Math.floor(ax1));
+    const xpxl2 = xend;
+    const ypxl2 = Math.floor(yend);
+    const frac2 = yend - ypxl2;
+
+    plot(xpxl2, ypxl2, (1 - frac2) * xgap2);
+    plot(xpxl2, ypxl2 + 1, frac2 * xgap2);
+
+    // основной цикл
+    for (let x = xpxl1 + 1; x <= xpxl2 - 1; x++) {
+        const fy = intery - Math.floor(intery);
+        plot(x, Math.floor(intery), 1 - fy);
+        plot(x, Math.floor(intery) + 1, fy);
+        intery += gradient;
+    }
+}
 
     private drawHSpan(y: number, x0: number, x1: number, color: RGBA) {
         const yInt = Math.floor(y);
@@ -202,10 +225,12 @@ this.height);
         const end = Math.floor(Math.max(x0, x1));
         for (let x = start; x <= end; x++) {
             if (x >= 0 && x < this.width) {
-                this.setPixel(x, yInt, color);
+                this.blendPixel(x, yInt, color);
             }
         }
     }
+
+    
 
     fillCircle(cx: number, cy: number, radius: number, color: RGBA) {
         const r = Math.abs(radius);
