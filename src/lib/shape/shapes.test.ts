@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { Transform, Rect, Line, Oval, boundsFromPoints } from './index';
+import { Transform } from './transform';
+import { Rect } from './rect';
+import { Line } from './line';
+import { Oval } from './oval';
+import { boundsFromPoints } from './bounds';
 import { mat3 } from '../math/mat3';
 
 // ----------------------------------------------------------------------

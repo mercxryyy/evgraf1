@@ -1,6 +1,6 @@
 import { Shape } from './shape';
 import { type Bounds, boundsFromPoints } from './bounds';
-import type { RasterRenderer, RGBA } from '../raster/RasterRenderer';
+import type { RasterRenderer } from '../raster/RasterRenderer';
 
 export class Line extends Shape {
     x1: number;
