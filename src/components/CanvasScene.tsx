@@ -63,7 +63,7 @@ export const CanvasScene = ({ lineAlg }: CanvasSceneProps) => {
 
         // 7. Catmull-Rom замкнутый 
         const catmullPoints = [
-            { x: 0, y: 0 }, { x: 60, y: -30 }, { x: 120, y: 10 }, { x: 180, y: -20 }, { x: 220, y: 20 }
+            { x: 0, y: 0 }, { x: 80, y: -30 }, { x: 110, y: 70 }, { x: 180, y: -20 }, { x: 220, y: 20 }
         ];
         const catmullPath = new PathBezier(catmullPoints, 'catmull', true);
         catmullPath.strokeStyle = '#FFAA44';
